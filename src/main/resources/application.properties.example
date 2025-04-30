@@ -21,7 +21,7 @@ springdoc.swagger-ui.path=/swagger-ui.html
 
 # Fixer.io (replace with your own key & URL if different)
 fixer.api.key=${FIXER_API_KEY}
-fixer.api.url=https://data.fixer.io/api/latest
+fixer.api.url=https://data.fixer.io/api
 
 # Cache interceptor logging
 logging.level.com.minelsaygisever.fxtrackr.client.FixerRestClient=INFO

@@ -1,16 +1,15 @@
-package com.minelsaygisever.fxtrackr.annotation.swagger;
+package com.minelsaygisever.fxtrackr.annotation;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
+
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import javax.validation.Constraint;
 import javax.validation.Payload;
 import javax.validation.constraints.Pattern;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
+
 
 /**
  * Meta-annotation combining request parameter validation and OpenAPI metadata
@@ -20,10 +19,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = {})
 @Parameter(
-        in = ParameterIn.QUERY,
+        in          = ParameterIn.QUERY,
         description = "Currency code (3 letters), case-insensitive",
-        required = true,
-        schema = @Schema(type = "string", pattern = "^[A-Za-z]{3}$")
+        required    = true,
+        schema      = @Schema(type = "string", pattern = "^[A-Za-z]{3}$")
 )
 @Pattern(
         regexp = "^[A-Za-z]{3}$",

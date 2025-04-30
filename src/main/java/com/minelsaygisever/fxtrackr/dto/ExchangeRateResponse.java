@@ -1,7 +1,7 @@
 package com.minelsaygisever.fxtrackr.dto;
 
 
-import lombok.AllArgsConstructor;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 @Data
 @Builder
 public class ExchangeRateResponse {
-    private String from;
-    private String to;
-    private BigDecimal rate;
+    @Schema(description = "Current exchange rate between source and target currency", example = "0.918273")
+    private BigDecimal exchangeRate;
 }

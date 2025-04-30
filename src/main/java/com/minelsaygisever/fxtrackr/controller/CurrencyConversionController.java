@@ -1,14 +1,19 @@
 package com.minelsaygisever.fxtrackr.controller;
 
+import com.minelsaygisever.fxtrackr.annotation.CurrencyConversionApi;
+import com.minelsaygisever.fxtrackr.dto.CurrencyConversionRequest;
+import com.minelsaygisever.fxtrackr.dto.CurrencyConversionResponse;
 import com.minelsaygisever.fxtrackr.dto.ExchangeRateResponse;
 import com.minelsaygisever.fxtrackr.service.CurrencyConversionService;
-import com.minelsaygisever.fxtrackr.annotation.swagger.CurrencyCodeParam;
-import com.minelsaygisever.fxtrackr.annotation.swagger.ExchangeRateApi;
+import com.minelsaygisever.fxtrackr.annotation.CurrencyCodeParam;
+import com.minelsaygisever.fxtrackr.annotation.ExchangeRateApi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import javax.validation.Valid;
 
 
 @Slf4j
@@ -27,5 +32,16 @@ public class CurrencyConversionController {
     ) {
         log.info("Received /exchange-rate request: from='{}' to='{}'", from, to);
         return ResponseEntity.ok(currencyConversionService.getExchangeRate(from, to));
+    }
+
+    @PostMapping("/convert")
+    @CurrencyConversionApi
+    public ResponseEntity<CurrencyConversionResponse> convertCurrency(
+            @Valid @RequestBody CurrencyConversionRequest request
+    ) {
+        log.info("Received /convert request: from='{}', to='{}', amount='{}'", request.getFrom(), request.getTo(), request.getAmount());
+        return ResponseEntity.ok(currencyConversionService.convertAndSaveCurrency(
+                request.getAmount(), request.getFrom(), request.getTo()
+        ));
     }
 }

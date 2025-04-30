@@ -4,6 +4,7 @@ import com.minelsaygisever.fxtrackr.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -56,16 +57,52 @@ public class GlobalExceptionHandler {
     /**
      * 400 Bad Request for parameter validation errors.
      */
-    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
-    public ResponseEntity<ErrorResponse> handleValidation(ConstraintViolationException ex) {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        String msg = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(fieldError -> String.format("Field '%s' - %s", fieldError.getField(), fieldError.getDefaultMessage()))
+                .findFirst()
+                .orElse("Invalid parameter");
+
+        ErrorResponse err = new ErrorResponse(
+                "INVALID_PARAMETER_FORMAT",
+                msg,
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
         String msg = ex.getConstraintViolations()
                 .stream()
                 .map(ConstraintViolation::getMessage)
                 .findFirst()
                 .orElse("Invalid parameter");
+
         ErrorResponse err = new ErrorResponse(
                 "INVALID_PARAMETER_FORMAT",
                 msg,
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParams(MissingServletRequestParameterException ex) {
+        String name = ex.getParameterName();
+        String msg = "Missing required parameter: " + name;
+        ErrorResponse err = new ErrorResponse("MISSING_PARAMETER", msg, LocalDateTime.now());
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(InvalidAmountException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAmount(InvalidAmountException ex) {
+        ErrorResponse err = new ErrorResponse(
+                "INVALID_AMOUNT",
+                ex.getMessage(),
                 LocalDateTime.now()
         );
         return ResponseEntity.badRequest().body(err);

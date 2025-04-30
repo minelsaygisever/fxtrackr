@@ -1,4 +1,4 @@
-package com.minelsaygisever.fxtrackr.annotation.swagger;
+package com.minelsaygisever.fxtrackr.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -59,7 +59,7 @@ public class FixerRestClient {
      * @return parsed FixerResponse
      */
     private FixerResponse callFixerLatestRates(String from, String to) {
-        String url = String.format("%s?access_key=%s&symbols=%s,%s", apiUrl, apiKey, from, to);
+        String url = String.format("%s/latest?access_key=%s&symbols=%s,%s", apiUrl, apiKey, from, to);
         log.debug("Calling Fixer URL: {}", url);
         try {
             ResponseEntity<FixerResponse> response = restTemplate.getForEntity(url, FixerResponse.class);
