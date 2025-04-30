@@ -12,14 +12,14 @@ public class CurrencyConversionRequest {
     @Digits(integer = 13, fraction = 6, message = "Amount can have up to 6 decimal places")
     private BigDecimal amount;
 
-    @NotBlank(message = "Currency code is required")
+    @NotBlank(message = "Field 'from' – Currency code is required")
     @Pattern(
             regexp  = "^[A-Za-z]{3}$",
             message = "Currency code must be three letters"
     )
     private String from;
 
-    @NotBlank(message = "Currency code is required")
+    @NotBlank(message = "Field 'to' – Currency code is required")
     @Pattern(
             regexp  = "^[A-Za-z]{3}$",
             message = "Currency code must be three letters"

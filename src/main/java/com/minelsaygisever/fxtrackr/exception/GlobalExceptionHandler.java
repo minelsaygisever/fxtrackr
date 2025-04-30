@@ -1,8 +1,10 @@
 package com.minelsaygisever.fxtrackr.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.minelsaygisever.fxtrackr.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @RestControllerAdvice
@@ -62,7 +65,7 @@ public class GlobalExceptionHandler {
         String msg = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(fieldError -> String.format("Field '%s' - %s", fieldError.getField(), fieldError.getDefaultMessage()))
+                .map(fieldError -> String.format("%s", fieldError.getDefaultMessage()))
                 .findFirst()
                 .orElse("Invalid parameter");
 
@@ -103,6 +106,37 @@ public class GlobalExceptionHandler {
         ErrorResponse err = new ErrorResponse(
                 "INVALID_AMOUNT",
                 ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(FilterParameterException.class)
+    public ResponseEntity<ErrorResponse> handleFilterParam(FilterParameterException ex) {
+        ErrorResponse err = new ErrorResponse(
+                "MISSING_FILTER",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(err);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidJson(HttpMessageNotReadableException ex) {
+        String message = "Malformed JSON request";
+        Throwable cause = ex.getCause();
+        if (cause instanceof InvalidFormatException) {
+            InvalidFormatException invalidEx = (InvalidFormatException) cause;
+            if (invalidEx.getTargetType().equals(LocalDate.class)) {
+                message = "Invalid date format, expected YYYY-MM-DD";
+            } else {
+                message = "Invalid value '" + invalidEx.getValue()
+                        + "' for type " + invalidEx.getTargetType().getSimpleName();
+            }
+        }
+        ErrorResponse err = new ErrorResponse(
+                "INVALID_REQUEST",
+                message,
                 LocalDateTime.now()
         );
         return ResponseEntity.badRequest().body(err);
