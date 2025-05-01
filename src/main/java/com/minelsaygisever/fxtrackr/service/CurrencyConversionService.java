@@ -2,30 +2,36 @@ package com.minelsaygisever.fxtrackr.service;
 
 import com.minelsaygisever.fxtrackr.client.FixerRestClient;
 import com.minelsaygisever.fxtrackr.domain.CurrencyConversion;
+import com.minelsaygisever.fxtrackr.dto.BulkConversionResult;
 import com.minelsaygisever.fxtrackr.dto.ConversionHistoryResponse;
 import com.minelsaygisever.fxtrackr.dto.CurrencyConversionResponse;
 import com.minelsaygisever.fxtrackr.dto.ExchangeRateResponse;
-import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
-import com.minelsaygisever.fxtrackr.exception.FilterParameterException;
-import com.minelsaygisever.fxtrackr.exception.InvalidAmountException;
+import com.minelsaygisever.fxtrackr.exception.*;
+import com.minelsaygisever.fxtrackr.mapper.ConversionMapper;
 import com.minelsaygisever.fxtrackr.repository.CurrencyConversionRepository;
+import com.minelsaygisever.fxtrackr.validation.ValidationUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 @Service
 @Validated
@@ -33,10 +39,14 @@ import java.util.Locale;
 public class CurrencyConversionService {
     private final FixerRestClient fixerRestClient;
     private final CurrencyConversionRepository currencyConversionRepository;
+    @Autowired
+    private ValidationUtil validationUtil;
+    @Autowired
+    private ConversionMapper conversionMapper;
 
     public ExchangeRateResponse getExchangeRate(String from, String to) {
-        String fromNorm = normalizeCode(from);
-        String toNorm = normalizeCode(to);
+        String fromNorm = validationUtil.validateAndNormalizeCurrencyCode(from);
+        String toNorm = validationUtil.validateAndNormalizeCurrencyCode(to);
 
         BigDecimal rate = fixerRestClient.getRate(fromNorm, toNorm);
         return ExchangeRateResponse.builder()
@@ -46,9 +56,9 @@ public class CurrencyConversionService {
 
     @Transactional
     public CurrencyConversionResponse convertAndSaveCurrency(BigDecimal amount, String from, String to) {
-        BigDecimal amountNorm = normalizeAmount(amount);
-        String fromNorm = normalizeCode(from);
-        String toNorm = normalizeCode(to);
+        BigDecimal amountNorm = validationUtil.validateAndNormalizeAmount(amount);
+        String fromNorm = validationUtil.validateAndNormalizeCurrencyCode(from);
+        String toNorm = validationUtil.validateAndNormalizeCurrencyCode(to);
 
         BigDecimal rate = fixerRestClient.getRate(fromNorm, toNorm);
         BigDecimal convertedAmount = amountNorm.multiply(rate).setScale(6, RoundingMode.HALF_UP);
@@ -96,7 +106,7 @@ public class CurrencyConversionService {
                         }
                         // No date filter or date matches — return a single‐item page
                         return new PageImpl<>(
-                                Collections.singletonList(toResponse(entity)),
+                                Collections.singletonList(conversionMapper.toHistoryResponse(entity)),
                                 pageable,
                                 1L
                         );
@@ -118,58 +128,59 @@ public class CurrencyConversionService {
 
             return currencyConversionRepository
                     .findByTimestampBetween(start, end, pageable)
-                    .map(this::toResponse);
+                    .map(conversionMapper::toHistoryResponse);
         }
 
         throw new FilterParameterException("Either transactionId or date must be provided");
     }
 
-    /**
-     * Normalizes a currency code by trimming whitespace and converting to uppercase
-     * using the ROOT locale. Returns null if the input is null.
-     */
-    private String normalizeCode(String code) {
-        if (code == null || code.trim().isEmpty()) {
-            throw new CurrencyNotFoundException("Currency code is required");
-        }
+    @Transactional
+    public List<BulkConversionResult> bulkConvert(MultipartFile file) {
+        List<BulkConversionResult> results = new ArrayList<>();
+        try (
+                Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+                CSVParser csvParser = CSVFormat.DEFAULT
+                        .withHeader("amount","from","to")
+                        .withFirstRecordAsHeader()
+                        .parse(reader)
+        ) {
+            validationUtil.validateCsvHeaders(csvParser);
 
-        String normalized = code.trim().toUpperCase(Locale.ROOT);
-        if (!normalized.matches("^[A-Z]{3}$")) {
-            throw new CurrencyNotFoundException(normalized);
-        }
+            int line = 1;
+            for (CSVRecord record : csvParser) {
+                BulkConversionResult.BulkConversionResultBuilder bulkConversionResultBuilder =
+                        BulkConversionResult.builder().line(line);
+                try {
+                    BigDecimal amount = new BigDecimal(record.get("amount").trim());
+                    String from = record.get("from").trim();
+                    String to   = record.get("to").trim();
 
-        return normalized;
-    }
+                    // Reuse existing convertAndSaveCurrency()
+                    CurrencyConversionResponse currencyConversionResponse =
+                            convertAndSaveCurrency(amount, from, to);
 
-    /**
-     * Validates and normalizes a BigDecimal amount:
-     * - Must not be null
-     * - Must be greater than zero
-     * - Max 13 integer digits and 6 decimal digits
-     * Returns amount scaled to 6 decimal places using HALF_UP.
-     */
-    private BigDecimal normalizeAmount(BigDecimal amount) {
-        if (amount == null) {
-            throw new InvalidAmountException("Amount is required");
-        }
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidAmountException("Amount must be greater than zero");
-        }
-        if (amount.precision() - amount.scale() > 13) {
-            throw new InvalidAmountException("Amount can have up to 13 integer digits");
-        }
-        return amount.setScale(6, RoundingMode.HALF_UP);
-    }
+                    bulkConversionResultBuilder.transactionId(currencyConversionResponse.getTransactionId())
+                            .convertedAmount(currencyConversionResponse.getConvertedAmount())
+                            .code("SUCCESS")
+                            .message("OK");
 
-    private ConversionHistoryResponse toResponse(CurrencyConversion e) {
-        return ConversionHistoryResponse.builder()
-                .transactionId(e.getId())
-                .sourceCurrency(e.getSourceCurrency())
-                .targetCurrency(e.getTargetCurrency())
-                .sourceAmount(e.getSourceAmount())
-                .convertedAmount(e.getConvertedAmount())
-                .exchangeRate(e.getExchangeRate())
-                .timestamp(e.getTimestamp())
-                .build();
+                } catch (CurrencyNotFoundException e) {
+                    bulkConversionResultBuilder.code("INVALID_CURRENCY").message(e.getMessage());
+                } catch (InvalidAmountException e) {
+                    bulkConversionResultBuilder.code("INVALID_AMOUNT").message(e.getMessage());
+                } catch (ExternalApiException e) {
+                    bulkConversionResultBuilder.code("EXTERNAL_API_ERROR").message(e.getMessage());
+                } catch (Exception e) {
+                    bulkConversionResultBuilder.code("PROCESSING_ERROR").message(e.getMessage());
+                }
+                results.add(bulkConversionResultBuilder.build());
+                line++;
+            }
+            return results;
+        } catch (InvalidCsvHeaderException ex) {
+            throw ex;
+        } catch (Exception e) {
+            throw new BulkProcessingException("Failed to process bulk CSV", e);
+        }
     }
 }

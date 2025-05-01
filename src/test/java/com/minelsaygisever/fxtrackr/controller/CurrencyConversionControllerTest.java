@@ -1,10 +1,12 @@
 package com.minelsaygisever.fxtrackr.controller;
 
+import com.minelsaygisever.fxtrackr.dto.BulkConversionResult;
 import com.minelsaygisever.fxtrackr.dto.ConversionHistoryResponse;
 import com.minelsaygisever.fxtrackr.dto.CurrencyConversionResponse;
 import com.minelsaygisever.fxtrackr.dto.ExchangeRateResponse;
 import com.minelsaygisever.fxtrackr.exception.ExternalApiException;
 import com.minelsaygisever.fxtrackr.exception.GlobalExceptionHandler;
+import com.minelsaygisever.fxtrackr.exception.InvalidCsvHeaderException;
 import com.minelsaygisever.fxtrackr.service.CurrencyConversionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -26,11 +29,11 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 /**
  * Unit tests for CurrencyConversionController - only the exchange-rate endpoint.
@@ -49,19 +52,17 @@ class CurrencyConversionControllerTest {
     @Test
     @DisplayName("GET /api/exchange-rate - Success")
     void testGetExchangeRate_Success() throws Exception {
-        // Arrange
         when(currencyConversionService.getExchangeRate("USD", "EUR"))
                 .thenReturn(ExchangeRateResponse.builder()
                         .exchangeRate(BigDecimal.valueOf(1.23))
                         .build());
 
-        // Act & Assert
         mockMvc.perform(get("/api/exchange-rate")
                         .param("from", "USD")
                         .param("to", "EUR")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exchangeRate").value(1.23));    // artık sadece rate bakıyoruz
+                .andExpect(jsonPath("$.exchangeRate").value(1.23));
     }
 
     @Test
@@ -79,11 +80,9 @@ class CurrencyConversionControllerTest {
     @Test
     @DisplayName("GET /api/exchange-rate - External API Error")
     void testGetExchangeRate_ExternalApiError() throws Exception {
-        // Arrange
         when(currencyConversionService.getExchangeRate("USD", "EUR"))
                 .thenThrow(new ExternalApiException("Failed to call Fixer API"));
 
-        // Act & Assert
         mockMvc.perform(get("/api/exchange-rate")
                         .param("from", "USD")
                         .param("to", "EUR")
@@ -95,7 +94,6 @@ class CurrencyConversionControllerTest {
     @Test
     @DisplayName("POST /api/convert - Success")
     void testConvertCurrency_Success() throws Exception {
-        // Arrange
         CurrencyConversionResponse response = CurrencyConversionResponse.builder()
                 .transactionId("tx-123")
                 .convertedAmount(BigDecimal.valueOf(92.34))
@@ -107,7 +105,6 @@ class CurrencyConversionControllerTest {
 
         String requestJson = "{ \"amount\": 100.00, \"from\": \"USD\", \"to\": \"EUR\" }";
 
-        // Act & Assert
         mockMvc.perform(post("/api/convert")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestJson))
@@ -160,7 +157,6 @@ class CurrencyConversionControllerTest {
     @Test
     @DisplayName("POST /api/conversions/search - by transactionId found")
     void testSearchHistory_ByTransactionId_Found() throws Exception {
-        // Arrange
         ConversionHistoryResponse dto = ConversionHistoryResponse.builder()
                 .transactionId("tx-123")
                 .sourceCurrency("USD")
@@ -295,6 +291,62 @@ class CurrencyConversionControllerTest {
                         .content(requestJson))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PARAMETER_FORMAT"));
+    }
+
+    @Test
+    @DisplayName("POST /api/convert/bulk - invalid CSV header → 400")
+    void testBulkConvert_InvalidHeader() throws Exception {
+        when(currencyConversionService.bulkConvert(any()))
+                .thenThrow(new InvalidCsvHeaderException("Invalid CSV header: missing columns [to]"));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "bad.csv", "text/csv",
+                ("amount,from\n" +
+                        "100.00,USD\n").getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/convert/bulk").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CSV_HEADER"))
+                .andExpect(jsonPath("$.message").value("Invalid CSV header: missing columns [to]"));
+    }
+
+    @Test
+    @DisplayName("POST /api/convert/bulk - mixed rows → returns per-row codes")
+    void testBulkConvert_MixedRows() throws Exception {
+        // prepare two row results
+        BulkConversionResult r1 = BulkConversionResult.builder()
+                .line(1)
+                .transactionId("tx-1")
+                .convertedAmount(new BigDecimal("90.00"))
+                .code("SUCCESS")
+                .message("OK")
+                .build();
+        BulkConversionResult r2 = BulkConversionResult.builder()
+                .line(2)
+                .code("INVALID_AMOUNT")
+                .message("Amount must be greater than zero")
+                .build();
+
+        when(currencyConversionService.bulkConvert(any()))
+                .thenReturn(List.of(r1, r2));
+
+        String csv =
+                "amount,from,to\n" +
+                        "100.00,USD,EUR\n" +
+                        "-5.00,USD,EUR\n"; // INVALID_AMOUNT
+        MockMultipartFile file = new MockMultipartFile(
+                "file","mix.csv","text/csv", csv.getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/convert/bulk").file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].line").value(1))
+                .andExpect(jsonPath("$[0].code").value("SUCCESS"))
+                .andExpect(jsonPath("$[0].transactionId").value("tx-1"))
+                .andExpect(jsonPath("$[1].line").value(2))
+                .andExpect(jsonPath("$[1].code").value("INVALID_AMOUNT"))
+                .andExpect(jsonPath("$[1].message").value("Amount must be greater than zero"));
     }
 
 }
