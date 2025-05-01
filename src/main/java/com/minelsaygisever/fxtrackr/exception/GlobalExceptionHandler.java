@@ -141,4 +141,24 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.badRequest().body(err);
     }
+
+    @ExceptionHandler(BulkProcessingException.class)
+    public ResponseEntity<ErrorResponse> handleBulkProcessing(BulkProcessingException ex) {
+        ErrorResponse err = new ErrorResponse(
+                "BULK_PROCESSING_ERROR",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+    }
+
+    @ExceptionHandler(InvalidCsvHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCsvHeader(InvalidCsvHeaderException ex) {
+        ErrorResponse err = new ErrorResponse(
+                "INVALID_CSV_HEADER",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(err);
+    }
 }

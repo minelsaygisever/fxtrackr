@@ -1,20 +1,20 @@
 package com.minelsaygisever.fxtrackr.controller;
 
-import com.minelsaygisever.fxtrackr.annotation.CurrencyConversionApi;
-import com.minelsaygisever.fxtrackr.annotation.SearchHistoryApi;
+import com.minelsaygisever.fxtrackr.annotation.*;
 import com.minelsaygisever.fxtrackr.dto.*;
 import com.minelsaygisever.fxtrackr.service.CurrencyConversionService;
-import com.minelsaygisever.fxtrackr.annotation.CurrencyCodeParam;
-import com.minelsaygisever.fxtrackr.annotation.ExchangeRateApi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.util.List;
 
 
 @Slf4j
@@ -60,5 +60,18 @@ public class CurrencyConversionController {
                 pageable
         );
         return ResponseEntity.ok(page);
+    }
+
+    @BulkConvertApi
+    @PostMapping(
+            value    = "/convert/bulk",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<List<BulkConversionResult>> bulkConvert(
+            @RequestPart("file") MultipartFile file
+    ) {
+        log.info("Received bulk CSV conversion: {}", file.getOriginalFilename());
+        List<BulkConversionResult> results = currencyConversionService.bulkConvert(file);
+        return ResponseEntity.ok(results);
     }
 }
