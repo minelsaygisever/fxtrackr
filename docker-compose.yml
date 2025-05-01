@@ -1,0 +1,13 @@
+services:
+  fxtrackr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fxtrackr:latest
+    ports:
+      - "8080:8080"
+    environment:
+      FIXER_API_KEY: ${FIXER_API_KEY}
+      FIXER_API_URL: https://data.fixer.io/api
+      SPRING_PROFILES_ACTIVE: default
+      SPRING_H2_CONSOLE_ENABLED: "true"
