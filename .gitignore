@@ -39,6 +39,3 @@ nbbuild/
 dist/
 nbdist/
 .nb-gradle/
-
-# Ignore your local Spring config
-application.properties
