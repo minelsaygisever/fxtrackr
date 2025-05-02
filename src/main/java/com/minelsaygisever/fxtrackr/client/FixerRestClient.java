@@ -1,5 +1,6 @@
 package com.minelsaygisever.fxtrackr.client;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.minelsaygisever.fxtrackr.dto.FixerError;
 import com.minelsaygisever.fxtrackr.dto.FixerResponse;
 import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
@@ -31,6 +32,9 @@ public class FixerRestClient {
     @Value("${fixer.api.url}")
     private String apiUrl;
 
+    // Using free-tier Fixer API: throttle to 1 request every 2.5 seconds to avoid rate-limit errors
+    private final RateLimiter rateLimiter = RateLimiter.create(0.4);
+
     /**
      * Fetches and caches the exchange rate between two currencies.
      * @param from source currency code
@@ -39,6 +43,7 @@ public class FixerRestClient {
      */
     @Cacheable(value = "fixerRates", key = "#from + '_' + #to")
     public BigDecimal getRate(String from, String to) {
+        rateLimiter.acquire();
         FixerResponse response = callFixerLatestRates(from, to);
         if (!response.isSuccess()) {
             String info = Optional.ofNullable(response.getError())
