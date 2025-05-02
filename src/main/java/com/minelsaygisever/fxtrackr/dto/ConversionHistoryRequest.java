@@ -7,6 +7,10 @@ import javax.validation.constraints.AssertTrue;
 import java.time.LocalDate;
 
 @Data
+@Schema(
+        name="ConversionHistoryRequest",
+        description="Filter criteria for fetching past conversions"
+)
 public class ConversionHistoryRequest {
     @Schema(description = "Filter by transaction ID", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
     private String transactionId;

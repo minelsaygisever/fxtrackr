@@ -1,11 +1,9 @@
 package com.minelsaygisever.fxtrackr.validation;
 
-import com.minelsaygisever.fxtrackr.exception.BulkProcessingException;
 import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
 import com.minelsaygisever.fxtrackr.exception.InvalidAmountException;
 import com.minelsaygisever.fxtrackr.exception.InvalidCsvHeaderException;
 import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -66,22 +64,6 @@ public class ValidationUtil {
             missing.removeAll(headers);
             throw new InvalidCsvHeaderException(
                     "Invalid CSV header: missing columns " + missing
-            );
-        }
-    }
-
-    /**
-     * Validates CSV record:
-     * - Must have values for 'amount', 'from', 'to'
-     */
-    public void validateCsvRecord(CSVRecord record, int line) {
-        try {
-            record.get("amount");
-            record.get("from");
-            record.get("to");
-        } catch (IllegalArgumentException iae) {
-            throw new BulkProcessingException(
-                    "Malformed CSV row " + line + ": expecting columns " + CSV_HEADERS
             );
         }
     }
