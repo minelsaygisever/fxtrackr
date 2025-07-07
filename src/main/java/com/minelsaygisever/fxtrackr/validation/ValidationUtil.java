@@ -1,8 +1,10 @@
 package com.minelsaygisever.fxtrackr.validation;
 
 import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
+import com.minelsaygisever.fxtrackr.exception.CurrencyNotSupportedException;
 import com.minelsaygisever.fxtrackr.exception.InvalidAmountException;
 import com.minelsaygisever.fxtrackr.exception.InvalidCsvHeaderException;
+import com.minelsaygisever.fxtrackr.repository.CurrencyRepository;
 import org.apache.commons.csv.CSVParser;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,12 @@ import java.util.Set;
 public class ValidationUtil {
     private static final List<String> CSV_HEADERS = List.of("amount","from","to");
 
+    private final CurrencyRepository currencyRepository;
+
+    public ValidationUtil(CurrencyRepository currencyRepository) {
+        this.currencyRepository = currencyRepository;
+    }
+
     /**
      * Normalize and validate a currency code:
      * - Must not be null or blank
@@ -24,12 +32,18 @@ public class ValidationUtil {
      */
     public String validateAndNormalizeCurrencyCode(String code) {
         if (code == null || code.trim().isEmpty()) {
-            throw new CurrencyNotFoundException("Currency code is required");
+            throw new CurrencyNotSupportedException("Currency code is required");
         }
         String normalized = code.trim().toUpperCase(Locale.ROOT);
         if (!normalized.matches("^[A-Z]{3}$")) {
-            throw new CurrencyNotFoundException("Invalid currency code: " + normalized);
+            throw new CurrencyNotSupportedException("Invalid currency code format: " + normalized);
         }
+
+        currencyRepository.findByCodeAndIsActiveTrue(normalized)
+                .orElseThrow(() -> new CurrencyNotSupportedException(
+                        "The currency '" + normalized + "' is not supported or is inactive."
+                ));
+
         return normalized;
     }
 
