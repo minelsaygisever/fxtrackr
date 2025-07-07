@@ -161,4 +161,14 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.badRequest().body(err);
     }
+
+    @ExceptionHandler(CurrencyNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleCurrencyNotSupported(CurrencyNotSupportedException ex) {
+        ErrorResponse err = new ErrorResponse(
+                "CURRENCY_NOT_SUPPORTED",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
+    }
 }
