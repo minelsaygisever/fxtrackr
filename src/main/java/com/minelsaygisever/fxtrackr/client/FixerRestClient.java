@@ -4,19 +4,16 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.minelsaygisever.fxtrackr.dto.FixerError;
 import com.minelsaygisever.fxtrackr.dto.FixerResponse;
 import com.minelsaygisever.fxtrackr.dto.FixerSymbolsResponse;
-import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
 import com.minelsaygisever.fxtrackr.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Map;
 import java.util.Optional;
 
@@ -46,7 +43,6 @@ public class FixerRestClient {
      */
     public Map<String, String> getSupportedSymbols() {
         rateLimiter.acquire();
-
         String url = String.format("%s/symbols?access_key=%s", apiUrl, apiKey);
         log.debug("Calling Fixer Symbols URL: {}", url);
 
@@ -73,56 +69,28 @@ public class FixerRestClient {
     }
 
     /**
-     * Fetches and caches the exchange rate between two currencies.
-     * @param from source currency code
-     * @param to target currency code
-     * @return calculated exchange rate
+     * Fetches the latest exchange rates from the Fixer API against the base currency (EUR).
+     * This is the primary method for getting rate data.
+     * @return A map of currency codes to their rates against the base currency.
      */
-    @Cacheable(value = "fixerRates", key = "#from + '_' + #to")
-    public BigDecimal getRate(String from, String to) {
+    public Map<String, BigDecimal> getLatestRates() {
         rateLimiter.acquire();
-        FixerResponse response = callFixerLatestRates(from, to);
-        if (!response.isSuccess()) {
-            String info = Optional.ofNullable(response.getError())
-                    .map(FixerError::getInfo)
-                    .orElse("Unknown error");
-            throw new ExternalApiException("Fixer API error: " + info);
-        }
+        String url = String.format("%s/latest?access_key=%s", apiUrl, apiKey);
+        log.debug("Calling Fixer URL for all latest rates.");
 
-        BigDecimal rateFrom = ofCurrency(response.getRates(), from);
-        BigDecimal rateTo   = ofCurrency(response.getRates(), to);
-        return rateTo.divide(rateFrom, 6, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Calls Fixer API for latest rates.
-     * @param from source currency code
-     * @param to target currency code
-     * @return parsed FixerResponse
-     */
-    private FixerResponse callFixerLatestRates(String from, String to) {
-        String url = String.format("%s/latest?access_key=%s&symbols=%s,%s", apiUrl, apiKey, from, to);
-        log.debug("Calling Fixer URL: {}", url);
         try {
             ResponseEntity<FixerResponse> response = restTemplate.getForEntity(url, FixerResponse.class);
-
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 throw new ExternalApiException("Unexpected HTTP response from Fixer API: HTTP " + response.getStatusCode());
             }
-            return response.getBody();
+            FixerResponse fixerResponse = response.getBody();
+            if (!fixerResponse.isSuccess()) {
+                String info = Optional.ofNullable(fixerResponse.getError()).map(FixerError::getInfo).orElse("Unknown error.");
+                throw new ExternalApiException("Fixer API returned an error: " + info);
+            }
+            return fixerResponse.getRates();
         } catch (RestClientException ex) {
-            throw new ExternalApiException("Failed to call Fixer API", ex);
+            throw new ExternalApiException("Failed to call Fixer API's /latest endpoint", ex);
         }
-    }
-
-    /**
-     * Retrieves rate value or throws if unsupported.
-     */
-    private BigDecimal ofCurrency(Map<String, BigDecimal> rates, String currency) {
-        BigDecimal value = rates.get(currency);
-        if (value == null) {
-            throw new CurrencyNotFoundException("Currency not supported: " + currency);
-        }
-        return value;
     }
 }
