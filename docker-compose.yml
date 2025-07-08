@@ -11,3 +11,14 @@ services:
       FIXER_API_URL: https://data.fixer.io/api
       SPRING_PROFILES_ACTIVE: default
       SPRING_H2_CONSOLE_ENABLED: "true"
+    depends_on:
+      - redis
+  redis:
+    image: "redis:alpine"
+    container_name: fxtrackr-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+volumes:
+  redis_data:

@@ -1,8 +1,9 @@
 package com.minelsaygisever.fxtrackr.exception;
 
 
-public class InvalidAmountException extends RuntimeException {
+public class InvalidAmountException extends ApplicationException {
+    private static final String ERROR_CODE = "INVALID_AMOUNT";
     public InvalidAmountException(String message) {
-        super(message);
+        super(ERROR_CODE, message);
     }
 }

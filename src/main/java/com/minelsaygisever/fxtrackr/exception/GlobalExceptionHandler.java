@@ -17,18 +17,14 @@ import java.time.LocalDateTime;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    /**
-     * 400 Bad Request when currency code is unsupported.
-     */
-    @ExceptionHandler(CurrencyNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleCurrencyNotFound(CurrencyNotFoundException ex) {
+    @ExceptionHandler(RateNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRateNotFound(RateNotFoundException ex) {
         ErrorResponse err = new ErrorResponse(
-                "INVALID_CURRENCY",
+                "RATE_NOT_AVAILABLE",
                 ex.getMessage(),
                 LocalDateTime.now()
         );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(err);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(err);
     }
 
     /**
@@ -162,8 +158,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(err);
     }
 
-    @ExceptionHandler(CurrencyNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleCurrencyNotSupported(CurrencyNotSupportedException ex) {
+    @ExceptionHandler(UnsupportedCurrencyException.class)
+    public ResponseEntity<ErrorResponse> handleCurrencyNotSupported(UnsupportedCurrencyException ex) {
         ErrorResponse err = new ErrorResponse(
                 "CURRENCY_NOT_SUPPORTED",
                 ex.getMessage(),

@@ -21,7 +21,7 @@ public class CurrencyDataInitializer implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(CurrencyDataInitializer.class);
 
     private final CurrencyRepository currencyRepository;
-    private final FixerRestClient fixerRestClient; // Assume you have a service to call the Fixer API
+    private final FixerRestClient fixerRestClient;
 
     public CurrencyDataInitializer(CurrencyRepository currencyRepository, FixerRestClient fixerRestClient) {
         this.currencyRepository = currencyRepository;

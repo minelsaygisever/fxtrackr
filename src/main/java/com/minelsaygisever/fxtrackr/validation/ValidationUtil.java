@@ -1,7 +1,6 @@
 package com.minelsaygisever.fxtrackr.validation;
 
-import com.minelsaygisever.fxtrackr.exception.CurrencyNotFoundException;
-import com.minelsaygisever.fxtrackr.exception.CurrencyNotSupportedException;
+import com.minelsaygisever.fxtrackr.exception.UnsupportedCurrencyException;
 import com.minelsaygisever.fxtrackr.exception.InvalidAmountException;
 import com.minelsaygisever.fxtrackr.exception.InvalidCsvHeaderException;
 import com.minelsaygisever.fxtrackr.repository.CurrencyRepository;
@@ -32,15 +31,15 @@ public class ValidationUtil {
      */
     public String validateAndNormalizeCurrencyCode(String code) {
         if (code == null || code.trim().isEmpty()) {
-            throw new CurrencyNotSupportedException("Currency code is required");
+            throw new UnsupportedCurrencyException("Currency code is required");
         }
         String normalized = code.trim().toUpperCase(Locale.ROOT);
         if (!normalized.matches("^[A-Z]{3}$")) {
-            throw new CurrencyNotSupportedException("Invalid currency code format: " + normalized);
+            throw new UnsupportedCurrencyException("Invalid currency code format: " + normalized);
         }
 
         currencyRepository.findByCodeAndIsActiveTrue(normalized)
-                .orElseThrow(() -> new CurrencyNotSupportedException(
+                .orElseThrow(() -> new UnsupportedCurrencyException(
                         "The currency '" + normalized + "' is not supported or is inactive."
                 ));
 

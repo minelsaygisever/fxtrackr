@@ -8,10 +8,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * that is not supported or not active in the system.
  */
 @ResponseStatus(HttpStatus.BAD_REQUEST)
-public class CurrencyNotSupportedException extends RuntimeException {
+public class UnsupportedCurrencyException extends ApplicationException {
 
-    public CurrencyNotSupportedException(String currencyCode) {
-        super("The currency '" + currencyCode + "' is not supported or is inactive.");
+    private static final String ERROR_CODE = "UNSUPPORTED_CURRENCY";
+
+    public UnsupportedCurrencyException(String currencyCode) {
+        super(ERROR_CODE, "The currency '" + currencyCode + "' is not supported or is inactive.");
     }
 }
 
